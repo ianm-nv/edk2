@@ -37,6 +37,14 @@
 
 #define MACH_VIRT_PCIE_MMIO_SIZE        SIZE_512GB
 
+//
+// PCI host bridge "ranges" property record layout.
+// Each entry is 7 cells (28 bytes): Type(4) + ChildBase(8) + CpuBase(8) + Size(8).
+//
+#define DTB_PCI_RANGES_RECORD_SIZE      28
+#define DTB_PCI_HOST_RANGE_MMIO64       (BIT25 | BIT24)
+#define DTB_PCI_HOST_RANGE_TYPEMASK     (BIT31 | BIT30 | BIT29 | BIT25 | BIT24)
+
 /**
   Default library constructor that obtains the memory size from a PCD.
 
@@ -124,6 +132,94 @@ GetFdtNodeAddress(CONST CHAR8* Compatible, UINT64 *Start, UINT64 *Size, UINT8 In
       return RETURN_SUCCESS;
     }
   }
+  return RETURN_NOT_FOUND;
+}
+
+/*
+  Parse the MMIO64 window from the PCI host bridge's "ranges" property.
+
+  The "ranges" property contains the actual MMIO base and size that QEMU
+  configured, which may differ from the hardcoded MACH_VIRT_PCIE_MMIO_SIZE
+  (e.g. when highmem-mmio-size is set to a non-default value).
+
+  @param[out]   MmioBase    CPU-side base address of the MMIO64 window
+  @param[out]   MmioSize    Size of the MMIO64 window
+
+  @return RETURN_SUCCESS, or an error if not found
+ */
+STATIC EFI_STATUS
+GetFdtPciMmio64Range(UINT64 *MmioBase, UINT64 *MmioSize)
+{
+  CONST VOID          *DeviceTree;
+  INT32               Node;
+
+  DeviceTree = (VOID *)(UINTN)PcdGet64 (PcdDeviceTreeInitialBaseAddress);
+  if (DeviceTree == NULL) {
+    return RETURN_UNSUPPORTED;
+  }
+
+  if (FdtCheckHeader (DeviceTree) != 0) {
+    return RETURN_INVALID_PARAMETER;
+  }
+
+  for (Node = FdtNextNode (DeviceTree, 0, NULL);
+       Node > 0;
+       Node = FdtNextNode (DeviceTree, Node, NULL))
+  {
+    CONST CHAR8  *CompatProp;
+    CONST CHAR8  *CompatItem;
+    INT32        PropSize;
+
+    CompatProp = FdtGetProp (DeviceTree, Node, "compatible", &PropSize);
+    if (CompatProp == NULL) {
+      continue;
+    }
+
+    CompatItem = CompatProp;
+    while ((CompatItem < CompatProp + PropSize) &&
+           (AsciiStrCmp (CompatItem, "pci-host-ecam-generic") != 0))
+    {
+      CompatItem += AsciiStrLen (CompatItem) + 1;
+    }
+
+    if (CompatItem < CompatProp + PropSize) {
+      CONST UINT8  *RangesProp;
+      INT32        RangesSize;
+      INT32        RecordIdx;
+
+      RangesProp = FdtGetProp (DeviceTree, Node, "ranges", &RangesSize);
+      if (RangesProp == NULL || RangesSize <= 0) {
+        return RETURN_NOT_FOUND;
+      }
+
+      for (RecordIdx = 0;
+           RecordIdx < RangesSize / DTB_PCI_RANGES_RECORD_SIZE;
+           RecordIdx++)
+      {
+        CONST UINT8  *Rec;
+        UINT32       Type;
+
+        Rec  = RangesProp + RecordIdx * DTB_PCI_RANGES_RECORD_SIZE;
+        Type = Fdt32ToCpu (ReadUnaligned32 ((CONST UINT32 *)Rec));
+
+        if ((Type & DTB_PCI_HOST_RANGE_TYPEMASK) == DTB_PCI_HOST_RANGE_MMIO64) {
+          *MmioBase = Fdt64ToCpu (ReadUnaligned64 ((CONST UINT64 *)(Rec + 12)));
+          *MmioSize = Fdt64ToCpu (ReadUnaligned64 ((CONST UINT64 *)(Rec + 20)));
+          DEBUG ((
+            DEBUG_INFO,
+            "%a: FDT MMIO64 window at 0x%lX size 0x%lX\n",
+            __func__,
+            *MmioBase,
+            *MmioSize
+            ));
+          return RETURN_SUCCESS;
+        }
+      }
+
+      return RETURN_NOT_FOUND;
+    }
+  }
+
   return RETURN_NOT_FOUND;
 }
 
@@ -241,9 +337,20 @@ ArmVirtGetMemoryMap (
     VirtualMemoryTable[Idx].Attributes   = ARM_MEMORY_REGION_ATTRIBUTE_DEVICE;
     Idx++;
 
-    /* The MMIO region follows, aligned on its own size */
-    RegionStart = ALIGN_VALUE(RegionStart + RegionSize, MACH_VIRT_PCIE_MMIO_SIZE);
-    RegionSize = MACH_VIRT_PCIE_MMIO_SIZE;
+    /*
+     * Get the actual MMIO64 window from the device tree "ranges" property.
+     * QEMU writes the real base and size there, which may exceed the
+     * hardcoded MACH_VIRT_PCIE_MMIO_SIZE when highmem-mmio-size is large.
+     * Fall back to the old heuristic only if parsing fails.
+     */
+    Status = GetFdtPciMmio64Range(&RegionStart, &RegionSize);
+    if (EFI_ERROR(Status)) {
+      DEBUG ((DEBUG_WARN,
+        "%a: MMIO64 range not found in FDT, falling back to hardcoded size\n",
+        __func__));
+      RegionStart = ALIGN_VALUE(RegionStart + RegionSize, MACH_VIRT_PCIE_MMIO_SIZE);
+      RegionSize = MACH_VIRT_PCIE_MMIO_SIZE;
+    }
 
     // High PCIe MMIO region
     VirtualMemoryTable[Idx].PhysicalBase = RegionStart | DevMapBit;
