@@ -264,8 +264,8 @@ DmaTransferBytes (
     }
   } else {
     Access = &LocalAccess;
-    AccessDeviceAddress = (EFI_PHYSICAL_ADDRESS)&LocalAccess;
-    BufferDeviceAddress = (EFI_PHYSICAL_ADDRESS)Buffer;
+    AccessDeviceAddress = (EFI_PHYSICAL_ADDRESS)(UINTN)&LocalAccess;
+    BufferDeviceAddress = (EFI_PHYSICAL_ADDRESS)(UINTN)Buffer;
   }
 
   Access->Control = SwapBytes32 (Control);
