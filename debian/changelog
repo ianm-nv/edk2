@@ -1,0 +1,22 @@
+edk2 (2025.10+nvidia3-1) noble; urgency=medium
+
+  * Added MMIO64 high memory window support for GPU passthrough
+    (highmem=1024G).
+
+ -- Ian May <ianm@nvidia.com>  Wed, 04 Mar 2026 00:08:52 -0600
+
+edk2 (2025.10+nvidia2-1) noble; urgency=medium
+
+  * Fixed: Added missing symlinks for firmware compatibility.
+
+ -- Ian May <ianm@nvidia.com>  Fri, 17 Oct 2025 08:20:00 -0500
+
+edk2 (2025.10+nvidia1-1) noble; urgency=medium
+
+  * NVIDIA custom build with ARM CCA staging source (dev/nvidia/arm-cca-20251009).
+  * Set FD_SIZE_IN_MB=3 for correct firmware size.
+  * Made ARM CCA components AARCH64-only (moved to Components.AARCH64).
+  * Fixed ARM 32-bit pointer casting in QemuFwCfgLibMmio.c for IOMMU fallback.
+  * ARM 32-bit packages included (without CCA support).
+
+ -- Ian May <ianm@nvidia.com>  Wed, 15 Oct 2025 23:46:27 -0500

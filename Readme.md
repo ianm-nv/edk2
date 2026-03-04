@@ -17,6 +17,38 @@ This branch will:
    firmware* code for testing, and reporting issues
  - serve as a baseline for developers to add new features.
 
+# Building Debian Packages (NVIDIA)
+
+This fork includes a `debian/` directory so you can build EDK2 Debian packages
+directly from a clone.
+
+## Prerequisites
+
+```bash
+sudo apt install build-essential debhelper python3 uuid-dev \
+  iasl nasm gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
+  gcc-riscv64-linux-gnu qemu-system-arm qemu-system-x86
+```
+
+## Build
+
+```bash
+git clone https://github.com/ianm-nv/edk2.git
+cd edk2
+git submodule update --init --recursive
+dpkg-buildpackage -us -uc -b
+```
+
+Packages are placed in the parent directory (`../`).
+
+## Install
+
+```bash
+sudo dpkg -i ../qemu-efi-aarch64_*.deb
+```
+
+The aarch64 firmware will be at `/usr/share/qemu-efi-aarch64/QEMU_EFI.fd`.
+
 # Goals
 
  - Streamline development and testing of the Arm CCA Realm Guest Firmware
