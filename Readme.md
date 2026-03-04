@@ -25,9 +25,10 @@ directly from a clone.
 ## Prerequisites
 
 ```bash
-sudo apt install build-essential debhelper python3 uuid-dev \
-  iasl nasm gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
-  gcc-riscv64-linux-gnu qemu-system-arm qemu-system-x86
+sudo apt install build-essential bc debhelper dh-exec dosfstools \
+  gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi gcc-riscv64-linux-gnu \
+  iasl lsb-release mtools nasm python3 python3-pexpect \
+  qemu-utils qemu-system-arm qemu-system-x86 uuid-dev xorriso
 ```
 
 ## Build

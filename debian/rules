@@ -55,10 +55,20 @@ undefine EFI_SOURCE
 undefine EDK_TOOLS_PATH
 undefine CONF_PATH
 
-%:
-	dh $@
+ifeq ($(DEB_BUILD_ARCH),arm64)
+SKIP_PACKAGES = -Novmf -Novmf-ia32 -Nefi-shell-ia32 -Nefi-shell-x64
+endif
 
-override_dh_auto_build: build-qemu-efi-aarch64 build-qemu-efi-arm build-ovmf build-ovmf32 build-qemu-efi-riscv64
+%:
+	dh $@ $(SKIP_PACKAGES)
+
+ifeq ($(DEB_BUILD_ARCH),arm64)
+BUILD_TARGETS = build-qemu-efi-aarch64 build-qemu-efi-arm build-qemu-efi-riscv64
+else
+BUILD_TARGETS = build-qemu-efi-aarch64 build-qemu-efi-arm build-ovmf build-ovmf32 build-qemu-efi-riscv64
+endif
+
+override_dh_auto_build: $(BUILD_TARGETS)
 
 debian/setup-build-stamp:
 	set -e; . ./edksetup.sh; \
